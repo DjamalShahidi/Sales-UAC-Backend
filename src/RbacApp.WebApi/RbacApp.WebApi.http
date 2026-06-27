@@ -1,0 +1,6 @@
+@RbacApp.WebApi_HostAddress = http://localhost:5248
+
+GET {{RbacApp.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
