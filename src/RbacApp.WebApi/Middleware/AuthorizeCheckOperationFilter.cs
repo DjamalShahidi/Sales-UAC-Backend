@@ -1,74 +1,101 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.OpenApi.Models;
-using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Authorization;
+using Swashbuckle.AspNetCore.SwaggerGen;
+using OpenApiOperation = Microsoft.OpenApi.OpenApiOperation;
+using OpenApiSecurityRequirement = Microsoft.OpenApi.OpenApiSecurityRequirement;
+using OpenApiSecurityScheme = Microsoft.OpenApi.OpenApiSecurityScheme;
+using OpenApiReference = Microsoft.OpenApi.OpenApiReference;
 
 namespace RbacApp.WebApi.Middleware;
 
 /// <summary>
-/// Swagger operation filter for annotating required permissions.
+/// Swagger operation filter for annotating required permissions and roles.
 /// </summary>
 public class AuthorizeCheckOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        var allowAnonymous = context.MethodInfo
-            .GetCustomAttributes(true)
-            .Any(m => m is AllowAnonymousAttribute);
+        var methodInfo = context.MethodInfo;
 
-        if (allowAnonymous) return;
+        var hasAllowAnonymous = methodInfo.GetCustomAttributes(true)
+            .Any(m => m.GetType().Name == "AllowAnonymousAttribute");
 
-        var requirePermissionAttrs = context.MethodInfo
-            .GetCustomAttributes(true)
-            .OfType<RequirePermissionAttribute>()
-            .ToList();
+        if (hasAllowAnonymous) return;
 
-        var requireRoleAttrs = context.MethodInfo
-            .GetCustomAttributes(true)
-            .OfType<RequireRoleAttribute>()
-            .ToList();
-
-        var classPermAttrs = context.MethodInfo.DeclaringType?
-            .GetCustomAttributes(true)
-            .OfType<RequirePermissionAttribute>()
-            .ToList() ?? new();
-
-        var classRoleAttrs = context.MethodInfo.DeclaringType?
-            .GetCustomAttributes(true)
-            .OfType<RequireRoleAttribute>()
-            .ToList() ?? new();
-
-        var allPerms = requirePermissionAttrs.Union(classPermAttrs)
-            .SelectMany(a => a.GetType().GetProperty("Permissions")?.GetValue(a) as string[] ?? Array.Empty<string>())
-            .Distinct().ToList();
-
-        var allRoles = requireRoleAttrs.Union(classRoleAttrs)
-            .SelectMany(a => a.GetType().GetProperty("Roles")?.GetValue(a) as string[] ?? Array.Empty<string>())
-            .Distinct().ToList();
+        var allPerms = GetPermissionValues(methodInfo);
+        var allRoles = GetRoleValues(methodInfo);
 
         if (allPerms.Count == 0 && allRoles.Count == 0)
             allPerms.Add("authenticated");
 
-        operation.Security = new List<OpenApiSecurityRequirement>
+        var desc = new List<string>();
+        if (allPerms.Count > 0) desc.Add($"Permissions: {string.Join(", ", allPerms)}");
+        if (allRoles.Count > 0) desc.Add($"Roles: {string.Join(", ", allRoles)}");
+
+        if (desc.Count > 0)
+            operation.Description = string.Join(" | ", desc);
+
+        operation.Security ??= new List<OpenApiSecurityRequirement>();
+        operation.Security.Add(new OpenApiSecurityRequirement
         {
-            new()
             {
+                new OpenApiSecurityScheme
                 {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-                    },
-                    Array.Empty<string>()
-                }
+                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                },
+                Array.Empty<string>()
             }
-        };
+        });
+    }
 
-        var tags = new List<string>();
-        if (allPerms.Count > 0) tags.Add($"Permissions: {string.Join(", ", allPerms)}");
-        if (allRoles.Count > 0) tags.Add($"Roles: {string.Join(", ", allRoles)}");
+    private static List<string> GetPermissionValues(MethodInfo method)
+    {
+        var result = new List<string>();
 
-        if (tags.Count > 0 && operation.Description is null)
-            operation.Description = string.Join(" | ", tags);
+        foreach (var attr in method.GetCustomAttributes(true).Where(a => a.GetType().Name == "RequirePermissionAttribute"))
+        {
+            var prop = attr.GetType().GetProperty("Permissions");
+            if (prop != null)
+                result.AddRange((prop.GetValue(attr) as string[]) ?? Array.Empty<string>());
+        }
+
+        if (method.DeclaringType is not null)
+        {
+            foreach (var attr in method.DeclaringType.GetCustomAttributes(true)
+                         .Where(a => a.GetType().Name == "RequirePermissionAttribute"))
+            {
+                var prop = attr.GetType().GetProperty("Permissions");
+                if (prop != null)
+                    result.AddRange((prop.GetValue(attr) as string[]) ?? Array.Empty<string>());
+            }
+        }
+
+        return result.Distinct().ToList();
+    }
+
+    private static List<string> GetRoleValues(MethodInfo method)
+    {
+        var result = new List<string>();
+
+        foreach (var attr in method.GetCustomAttributes(true).Where(a => a.GetType().Name == "RequireRoleAttribute"))
+        {
+            var prop = attr.GetType().GetProperty("Roles");
+            if (prop != null)
+                result.AddRange((prop.GetValue(attr) as string[]) ?? Array.Empty<string>());
+        }
+
+        if (method.DeclaringType is not null)
+        {
+            foreach (var attr in method.DeclaringType.GetCustomAttributes(true)
+                         .Where(a => a.GetType().Name == "RequireRoleAttribute"))
+            {
+                var prop = attr.GetType().GetProperty("Roles");
+                if (prop != null)
+                    result.AddRange((prop.GetValue(attr) as string[]) ?? Array.Empty<string>());
+            }
+        }
+
+        return result.Distinct().ToList();
     }
 }

@@ -11,13 +11,19 @@ namespace RbacApp.Infrastructure.Services;
 /// Seed اولیه‌ی دیتابیس tenant جدید:
 /// - نقش "Admin" سیستمی با تمام دسترسی‌ها
 /// - نقش "Viewer" سیستمی با فقط دسترسی‌های خواندن
+/// - اولین ادمین tenant
+/// مستقیماً روی DbContext کار می‌کند تا از پیچیدگی ساخت دستی UserManager جلوگیری شود.
 /// </summary>
 public class TenantSeeder : ITenantSeeder
 {
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
     private readonly ILogger<TenantSeeder> _logger;
 
-    public TenantSeeder(ILogger<TenantSeeder> logger)
-        => _logger = logger;
+    public TenantSeeder(IPasswordHasher<ApplicationUser> passwordHasher, ILogger<TenantSeeder> logger)
+    {
+        _passwordHasher = passwordHasher;
+        _logger = logger;
+    }
 
     public async Task SeedRolesAsync(ITenantDbContext db, CancellationToken ct = default)
     {
@@ -41,37 +47,16 @@ public class TenantSeeder : ITenantSeeder
     public async Task SeedFirstAdminAsync(
         ITenantDbContext db, string fullName, string email, string password, CancellationToken ct = default)
     {
-        // ساخت UserManager و RoleManager برای دیتابیس tenant.
-        var context = db.Context;
-        var userStore = new UserStore<ApplicationUser>(context);
-        var roleStore = new RoleStore<ApplicationRole>(context);
-
-        var userManager = new UserManager<ApplicationUser>(
-            userStore, null!,
-            new PasswordHasher<ApplicationUser>(),
-            null, null, null, null, null, null!);
-        userManager.Options.Password.RequireDigit = true;
-        userManager.Options.Password.RequireLowercase = true;
-        userManager.Options.Password.RequireUppercase = true;
-        userManager.Options.Password.RequireNonAlphanumeric = false;
-        userManager.Options.Password.RequiredLength = 8;
-
-        var roleManager = new RoleManager<ApplicationRole>(
-            roleStore, null!, null!, null!, null!);
-
-        // مطمئن شویم نقش Admin وجود دارد.
-        if (!await roleManager.RoleExistsAsync("Admin"))
+        // اطمینان از وجود نقش Admin.
+        var adminRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == "Admin", ct);
+        if (adminRole is null)
         {
-            await roleManager.CreateAsync(new ApplicationRole
-            {
-                Name = "Admin",
-                IsSystem = true,
-                Description = "مدیر سیستم"
-            });
+            await SeedRolesAsync(db, ct);
+            adminRole = await db.Roles.FirstAsync(r => r.Name == "Admin", ct);
         }
 
         // بررسی اینکه کاربر قبلاً وجود ندارد.
-        var existing = await userManager.FindByEmailAsync(email);
+        var existing = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
         if (existing is not null)
         {
             _logger.LogWarning("ادمین اولیه {Email} قبلاً وجود دارد.", email);
@@ -84,19 +69,26 @@ public class TenantSeeder : ITenantSeeder
             Email = email,
             EmailConfirmed = true,
             IsActive = true,
-            FullName = fullName
+            FullName = fullName,
+            NormalizedEmail = email.ToUpperInvariant(),
+            NormalizedUserName = email.ToUpperInvariant()
         };
 
-        var result = await userManager.CreateAsync(user, password);
-        if (!result.Succeeded)
+        // هش رمز عبور با همان PasswordHasher که Identity استفاده می‌کند.
+        user.PasswordHash = _passwordHasher.HashPassword(user, password);
+        // stamp امنیتی برای invalidating توکن‌ها.
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+
+        db.Users.Add(user);
+
+        // پیوند کاربر با نقش Admin (جدول AspNetUserRoles که Identity می‌سازد).
+        db.Context.Add(new IdentityUserRole<Guid>
         {
-            var errors = string.Join(" | ", result.Errors.Select(e => e.Description));
-            throw new Domain.Exceptions.AppException($"ساخت ادمین اولیه ناموفق: {errors}");
-        }
+            UserId = user.Id,
+            RoleId = adminRole.Id
+        });
 
-        await userManager.AddToRoleAsync(user, "Admin");
-        await context.SaveChangesAsync(ct);
-
+        await db.Context.SaveChangesAsync(ct);
         _logger.LogInformation("ادمین اولیه {Email} ساخته شد.", email);
     }
 
@@ -110,6 +102,7 @@ public class TenantSeeder : ITenantSeeder
         var role = new ApplicationRole
         {
             Name = name,
+            NormalizedName = name.ToUpperInvariant(),
             Description = description,
             IsSystem = isSystem
         };

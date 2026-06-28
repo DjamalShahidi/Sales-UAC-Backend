@@ -42,14 +42,14 @@ public class CurrentUserService : ICurrentUserService
 
     public bool IsAuthenticated => User?.Identity?.IsAuthenticated ?? false;
 
-    public bool IsSuperAdmin => HasRole("SuperAdmin");
+    public bool IsSuperAdmin => IsInRole("SuperAdmin");
 
     public IReadOnlyCollection<string> Roles
-        => User?.FindAll("role").Select(c => c.Value).ToList().AsReadOnly()
+        => (IReadOnlyCollection<string>?)(User?.FindAll("role").Select(c => c.Value).ToList())
            ?? Array.Empty<string>();
 
     public IReadOnlyCollection<string> Permissions
-        => User?.FindAll("permission").Select(c => c.Value).ToList().AsReadOnly()
+        => (IReadOnlyCollection<string>?)(User?.FindAll("permission").Select(c => c.Value).ToList())
            ?? Array.Empty<string>();
 
     public bool HasPermission(string permission)

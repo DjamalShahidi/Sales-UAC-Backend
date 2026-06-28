@@ -220,10 +220,10 @@ public class JwtTokenService : IJwtTokenService
             var principal = handler.ValidateToken(token, parameters, out _);
 
             if (principal.FindFirstValue(JwtRegisteredClaimNames.Sub) is not string sub)
-                return null;
+                return Task.FromResult<JwtPrincipal?>(null);
 
             if (!Guid.TryParse(sub, out var userId))
-                return null;
+                return Task.FromResult<JwtPrincipal?>(null);
 
             var email = principal.FindFirstValue(JwtRegisteredClaimNames.Email) ?? "";
             var fullName = principal.FindFirstValue("fullName") ?? "";
@@ -231,12 +231,15 @@ public class JwtTokenService : IJwtTokenService
             var tenantSlug = principal.FindFirstValue("tenantSlug") ?? "";
             var roles = principal.FindAll("role").Select(c => c.Value).ToList();
 
-            return new JwtPrincipal(userId, email,
-                Guid.Parse(tenantId), tenantSlug, roles);
+            var result = Guid.TryParse(tenantId, out var tenantGuid)
+                ? new JwtPrincipal(userId, email, tenantGuid, tenantSlug, roles)
+                : new JwtPrincipal(userId, email, Guid.Empty, tenantSlug, roles);
+
+            return Task.FromResult<JwtPrincipal?>(result);
         }
         catch
         {
-            return null;
+            return Task.FromResult<JwtPrincipal?>(null);
         }
     }
 

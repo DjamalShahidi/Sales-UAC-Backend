@@ -2,9 +2,9 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using RbacApp.Application.Common.Interfaces;
 using RbacApp.Domain.Entities.Identity;
@@ -25,17 +25,28 @@ public static class DependencyInjection
         // ---- Memory Cache ----
         services.AddMemoryCache();
 
+        // ---- Identity Options ----
+        services.Configure<IdentityOptions>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequiredLength = 8;
+            options.Lockout.MaxFailedAccessAttempts = 5;
+            options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            options.User.RequireUniqueEmail = true;
+        });
+
+        services.AddTransient<IPasswordHasher<ApplicationUser>, PasswordHasher<ApplicationUser>>();
+
         // ---- Catalog DB ----
         services.AddDbContext<CatalogDbContext>(options =>
             options.UseSqlServer(
                 configuration.GetConnectionString("Catalog")!,
                 sql => sql.MigrationsAssembly(typeof(CatalogDbContext).Assembly.FullName)));
 
-        services.AddScoped<ICatalogDbContext>(sp =>
-        {
-            var db = sp.GetRequiredService<CatalogDbContext>();
-            return db;
-        });
+        services.AddScoped<ICatalogDbContext>(sp => sp.GetRequiredService<CatalogDbContext>());
 
         // ---- Tenant Context (scoped per request) ----
         services.AddScoped<ITenantContext, TenantContext>();
@@ -43,48 +54,16 @@ public static class DependencyInjection
         // ---- Tenant DbContext Factory ----
         services.AddScoped<ITenantDbContextFactory, TenantDbContextFactory>();
 
-        // ---- Identity for Tenant (کدنویسی شده به‌صورت factory) ----
-        // UserManager و RoleManager برای tenant: باید با DbContext پویا ساخته شوند.
-        // یک factory برای ساخت UserManager و RoleManager با TenantDbContext.
-        services.AddScoped(sp =>
-        {
-            var tenantCtx = sp.GetRequiredService<ITenantContext>();
-            var factory = sp.GetRequiredService<ITenantDbContextFactory>();
-
-            if (!tenantCtx.IsAvailable)
-                throw new System.InvalidOperationException("tenant context در دسترس نیست.");
-
-            var db = factory.CreateForCurrentTenant();
-
-            var userStore = new UserStore<ApplicationUser>(db.Context);
-            var roleStore = new RoleStore<ApplicationRole>(db.Context);
-
-            var userManager = new UserManager<ApplicationUser>(
-                userStore, sp.GetRequiredService<IOptions<IdentityOptions>>(),
-                sp.GetRequiredService<IPasswordHasher<ApplicationUser>>(),
-                sp.GetRequiredService<IEnumerable<IUserValidator<ApplicationUser>>>(),
-                sp.GetRequiredService<IEnumerable<IPasswordValidator<ApplicationUser>>>(),
-                sp.GetRequiredService<ILookupNormalizer>(),
-                sp.GetRequiredService<IdentityErrorDescriber>(),
-                sp.GetRequiredService<IServiceProvider>());
-
-            var roleManager = new RoleManager<ApplicationRole>(
-                roleStore, sp.GetRequiredService<IRoleValidator<ApplicationRole>>(),
-                sp.GetRequiredService<ILookupNormalizer>(),
-                sp.GetRequiredService<IdentityErrorDescriber>(),
-                sp.GetRequiredService<ILoggerFactory>());
-
-            return (UserManager: userManager, RoleManager: roleManager, Db: db);
-        });
+        // ---- Identity Managers Factory (برای tenant جاری) ----
+        services.AddScoped<TenantIdentityContext>();
 
         // ---- Identity Service ----
         services.AddScoped<IIdentityService>(sp =>
         {
-            var (userManager, roleManager, db) = sp.GetRequiredService<
-                (UserManager<ApplicationUser> UserManager,
-                 RoleManager<ApplicationRole> RoleManager,
-                 ITenantDbContext Db)>();
-            return new IdentityService(userManager, roleManager, db);
+            var identityCtx = sp.GetRequiredService<TenantIdentityContext>();
+            var db = sp.GetRequiredService<ITenantDbContextFactory>().CreateForCurrentTenant();
+            identityCtx.Attach(db);
+            return new IdentityService(identityCtx.UserManager, identityCtx.RoleManager, db);
         });
 
         // ---- JWT Token Service ----

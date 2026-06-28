@@ -1,5 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using RbacApp.Application;
 using RbacApp.Infrastructure;
 using RbacApp.Infrastructure.MultiTenancy;

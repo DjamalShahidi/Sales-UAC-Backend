@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
+using RbacApp.Application.Dtos;
 using RbacApp.Application.Features.Users.Commands;
 using RbacApp.Application.Features.Users.Queries;
 using RbacApp.WebApi.Middleware;

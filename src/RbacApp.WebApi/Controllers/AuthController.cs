@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
+using RbacApp.Application.Dtos;
 using RbacApp.Application.Features.Auth.Commands;
 
 namespace RbacApp.WebApi.Controllers;

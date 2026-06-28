@@ -13,18 +13,18 @@ public interface IIdentityService
 
     Task<bool> CheckPasswordAsync(ApplicationUser user, string password, CancellationToken ct = default);
 
-    Task<(IdentityResult Result, Guid UserId)> CreateUserAsync(
+    Task<(IdentityOutcome Result, Guid UserId)> CreateUserAsync(
         ApplicationUser user,
         string password,
         CancellationToken ct = default);
 
-    Task<IdentityResult> UpdateUserAsync(ApplicationUser user, CancellationToken ct = default);
+    Task<IdentityOutcome> UpdateUserAsync(ApplicationUser user, CancellationToken ct = default);
 
-    Task<IdentityResult> DeleteUserAsync(Guid userId, CancellationToken ct = default);
+    Task<IdentityOutcome> DeleteUserAsync(Guid userId, CancellationToken ct = default);
 
-    Task<IdentityResult> AddUserToRoleAsync(Guid userId, string roleName, CancellationToken ct = default);
+    Task<IdentityOutcome> AddUserToRoleAsync(Guid userId, string roleName, CancellationToken ct = default);
 
-    Task<IdentityResult> RemoveUserFromRolesAsync(Guid userId, IEnumerable<string> roleNames, CancellationToken ct = default);
+    Task<IdentityOutcome> RemoveUserFromRolesAsync(Guid userId, IEnumerable<string> roleNames, CancellationToken ct = default);
 
     Task<IList<string>> GetUserRolesAsync(Guid userId, CancellationToken ct = default);
 
@@ -32,17 +32,16 @@ public interface IIdentityService
 
     Task<bool> IsInRoleAsync(Guid userId, string roleName, CancellationToken ct = default);
 
-    Task<IdentityResult> ResetPasswordAsync(Guid userId, string newPassword, CancellationToken ct = default);
+    Task<IdentityOutcome> ResetPasswordAsync(Guid userId, string newPassword, CancellationToken ct = default);
 
     Task UpdateLastLoginAsync(Guid userId, CancellationToken ct = default);
 }
 
 /// <summary>
-/// همان IdentityResult مایکروسافت — برای کاهش وابستگی مستقیم در Domain بلااستفاده می‌رود،
-/// ولی در Application مشکلی ندارد.
+/// خلاصه‌ی نتیجه‌ی عملیات Identity، مستقل از نوع مایکروسافت.
 /// </summary>
-public record IdentityResult(bool Succeeded, IEnumerable<string> Errors)
+public record IdentityOutcome(bool Succeeded, IReadOnlyList<string> Errors)
 {
-    public static IdentityResult Success() => new(true, Array.Empty<string>());
-    public static IdentityResult Failure(params string[] errors) => new(false, errors);
+    public static IdentityOutcome Success() => new(true, Array.Empty<string>());
+    public static IdentityOutcome Failure(params string[] errors) => new(false, errors);
 }

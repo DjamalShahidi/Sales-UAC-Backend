@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RbacApp.Application.Common.Interfaces;
-using RbacApp.Domain.Entities;
+using TenantEntity = RbacApp.Domain.Entities.Tenant;
 
 namespace RbacApp.Infrastructure.Persistence.Catalog;
 
@@ -13,15 +13,15 @@ public class CatalogDbContext : DbContext, ICatalogDbContext
 {
     public CatalogDbContext(DbContextOptions<CatalogDbContext> options) : base(options) { }
 
-    public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
 
-    public async Task<Tenant?> FindBySlugAsync(string slug, CancellationToken ct = default)
+    public async Task<TenantEntity?> FindBySlugAsync(string slug, CancellationToken ct = default)
         => await Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug, ct);
 
-    public async Task<Tenant?> FindByIdAsync(Guid id, CancellationToken ct = default)
-        => await Tenants.FirstOrDefaultAsync(t => t.Id == id, ct);
+    public async Task<TenantEntity?> FindByIdAsync(Guid id, CancellationToken ct = default)
+        => await Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
 
-    public async Task<List<Tenant>> ListAsync(CancellationToken ct = default)
+    public async Task<List<TenantEntity>> ListAsync(CancellationToken ct = default)
         => await Tenants.AsNoTracking().ToListAsync(ct);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -31,9 +31,9 @@ public class CatalogDbContext : DbContext, ICatalogDbContext
     }
 }
 
-public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
+public class TenantConfiguration : IEntityTypeConfiguration<TenantEntity>
 {
-    public void Configure(EntityTypeBuilder<Tenant> b)
+    public void Configure(EntityTypeBuilder<TenantEntity> b)
     {
         b.ToTable("Tenants");
         b.HasKey(t => t.Id);

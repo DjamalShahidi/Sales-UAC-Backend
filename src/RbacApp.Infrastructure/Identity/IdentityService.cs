@@ -34,24 +34,24 @@ public class IdentityService : IIdentityService
     public async Task<bool> CheckPasswordAsync(ApplicationUser user, string password, CancellationToken ct = default)
         => await _userManager.CheckPasswordAsync(user, password);
 
-    public async Task<(IdentityResult Result, Guid UserId)> CreateUserAsync(
+    public async Task<(IdentityOutcome Result, Guid UserId)> CreateUserAsync(
         ApplicationUser user, string password, CancellationToken ct = default)
     {
         var result = await _userManager.CreateAsync(user, password);
         return (MapResult(result), user.Id);
     }
 
-    public async Task<IdentityResult> UpdateUserAsync(ApplicationUser user, CancellationToken ct = default)
+    public async Task<IdentityOutcome> UpdateUserAsync(ApplicationUser user, CancellationToken ct = default)
         => MapResult(await _userManager.UpdateAsync(user));
 
-    public async Task<IdentityResult> DeleteUserAsync(Guid userId, CancellationToken ct = default)
+    public async Task<IdentityOutcome> DeleteUserAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await FindUserByIdAsync(userId, ct)
             ?? throw new Domain.Exceptions.NotFoundException("User", userId);
         return MapResult(await _userManager.DeleteAsync(user));
     }
 
-    public async Task<IdentityResult> AddUserToRoleAsync(Guid userId, string roleName, CancellationToken ct = default)
+    public async Task<IdentityOutcome> AddUserToRoleAsync(Guid userId, string roleName, CancellationToken ct = default)
     {
         var user = await FindUserByIdAsync(userId, ct)
             ?? throw new Domain.Exceptions.NotFoundException("User", userId);
@@ -68,7 +68,7 @@ public class IdentityService : IIdentityService
         return MapResult(await _userManager.AddToRoleAsync(user, roleName));
     }
 
-    public async Task<IdentityResult> RemoveUserFromRolesAsync(
+    public async Task<IdentityOutcome> RemoveUserFromRolesAsync(
         Guid userId, IEnumerable<string> roleNames, CancellationToken ct = default)
     {
         var user = await FindUserByIdAsync(userId, ct)
@@ -110,7 +110,7 @@ public class IdentityService : IIdentityService
         return user is not null && await _userManager.IsInRoleAsync(user, roleName);
     }
 
-    public async Task<IdentityResult> ResetPasswordAsync(Guid userId, string newPassword, CancellationToken ct = default)
+    public async Task<IdentityOutcome> ResetPasswordAsync(Guid userId, string newPassword, CancellationToken ct = default)
     {
         var user = await FindUserByIdAsync(userId, ct)
             ?? throw new Domain.Exceptions.NotFoundException("User", userId);
@@ -129,12 +129,11 @@ public class IdentityService : IIdentityService
         }
     }
 
-    private static Application.Common.Interfaces.IdentityResult MapResult(
-        Microsoft.AspNetCore.Identity.IdentityResult result)
+    private static IdentityOutcome MapResult(Microsoft.AspNetCore.Identity.IdentityResult result)
     {
         return result.Succeeded
-            ? Application.Common.Interfaces.IdentityResult.Success()
-            : Application.Common.Interfaces.IdentityResult.Failure(
+            ? IdentityOutcome.Success()
+            : IdentityOutcome.Failure(
                 result.Errors.Select(e => e.Description).ToArray());
     }
 }
