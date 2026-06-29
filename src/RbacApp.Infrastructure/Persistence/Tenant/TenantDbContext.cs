@@ -15,9 +15,9 @@ public class TenantDbContext : IdentityDbContext<ApplicationUser, ApplicationRol
 {
     public TenantDbContext(DbContextOptions<TenantDbContext> options) : base(options) { }
 
-    public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
+    public new DbSet<ApplicationUser> Users => Set<ApplicationUser>();
 
-    public DbSet<ApplicationRole> Roles => Set<ApplicationRole>();
+    public new DbSet<ApplicationRole> Roles => Set<ApplicationRole>();
 
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 

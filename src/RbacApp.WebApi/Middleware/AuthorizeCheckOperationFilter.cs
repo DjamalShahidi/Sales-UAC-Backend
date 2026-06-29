@@ -1,16 +1,13 @@
 using System.Reflection;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
-using OpenApiOperation = Microsoft.OpenApi.OpenApiOperation;
-using OpenApiSecurityRequirement = Microsoft.OpenApi.OpenApiSecurityRequirement;
-using OpenApiSecurityScheme = Microsoft.OpenApi.OpenApiSecurityScheme;
-using OpenApiReference = Microsoft.OpenApi.OpenApiReference;
 
 namespace RbacApp.WebApi.Middleware;
 
 /// <summary>
-/// Swagger operation filter for annotating required permissions and roles.
+/// Swagger operation filter برای نمایش دسترسی‌ها و نقش‌های لازم هر endpoint.
 /// </summary>
 public class AuthorizeCheckOperationFilter : IOperationFilter
 {
@@ -40,11 +37,8 @@ public class AuthorizeCheckOperationFilter : IOperationFilter
         operation.Security.Add(new OpenApiSecurityRequirement
         {
             {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-                },
-                Array.Empty<string>()
+                new OpenApiSecuritySchemeReference("Bearer"),
+                new List<string>()
             }
         });
     }
@@ -53,7 +47,8 @@ public class AuthorizeCheckOperationFilter : IOperationFilter
     {
         var result = new List<string>();
 
-        foreach (var attr in method.GetCustomAttributes(true).Where(a => a.GetType().Name == "RequirePermissionAttribute"))
+        foreach (var attr in method.GetCustomAttributes(true)
+                     .Where(a => a.GetType().Name == "RequirePermissionAttribute"))
         {
             var prop = attr.GetType().GetProperty("Permissions");
             if (prop != null)
@@ -78,7 +73,8 @@ public class AuthorizeCheckOperationFilter : IOperationFilter
     {
         var result = new List<string>();
 
-        foreach (var attr in method.GetCustomAttributes(true).Where(a => a.GetType().Name == "RequireRoleAttribute"))
+        foreach (var attr in method.GetCustomAttributes(true)
+                     .Where(a => a.GetType().Name == "RequireRoleAttribute"))
         {
             var prop = attr.GetType().GetProperty("Roles");
             if (prop != null)

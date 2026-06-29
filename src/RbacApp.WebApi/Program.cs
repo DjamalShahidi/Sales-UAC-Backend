@@ -44,18 +44,16 @@ builder.Services.AddSwaggerGen(options =>
         BearerFormat = "JWT"
     });
 
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    // در OpenApi 2.7.5، AddSecurityRequirement یک Func می‌گیرد.
+    options.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            Array.Empty<string>()
+            new OpenApiSecuritySchemeReference("Bearer"),
+            new List<string>()
         }
     });
 
-    // Operation filters for [RequirePermission] documentation
+    // Operation filter برای نمایش دسترسی‌های لازم در Swagger.
     options.OperationFilter<AuthorizeCheckOperationFilter>();
 });
 

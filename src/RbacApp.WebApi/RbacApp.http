@@ -1,0 +1,183 @@
+### ============================================================
+### RbacApp API — نمونه‌ی درخواست‌ها برای تست
+### در VS Code با افزونه‌ی REST Client یا JetBrains Rider قابل اجراست.
+### ============================================================
+
+@baseUrl = https://localhost:5001
+@tenantSlug = acme
+
+### ثبت اولین ادمین tenant (فقط وقتی tenant خالی است)
+POST {{baseUrl}}/api/auth/register-first-admin
+X-Tenant-Slug: {{tenantSlug}}
+Content-Type: application/json
+
+{
+  "fullName": "ادمین اصلی",
+  "email": "admin@acme.com",
+  "password": "StrongPass1"
+}
+
+### ورود
+# @name login
+POST {{baseUrl}}/api/auth/login
+X-Tenant-Slug: {{tenantSlug}}
+Content-Type: application/json
+
+{
+  "tenantSlug": "{{tenantSlug}}",
+  "email": "admin@acme.com",
+  "password": "StrongPass1"
+}
+
+### ذخیره‌ی توکن از پاسخ ورود
+@accessToken = {{login.response.body.accessToken}}
+@refreshToken = {{login.response.body.refreshToken}}
+
+### تمدید توکن
+POST {{baseUrl}}/api/auth/refresh
+X-Tenant-Slug: {{tenantSlug}}
+Content-Type: application/json
+
+{
+  "accessToken": "{{accessToken}}",
+  "refreshToken": "{{refreshToken}}"
+}
+
+### خروج
+POST {{baseUrl}}/api/auth/logout
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+
+### ============================================================
+### Users
+### ============================================================
+
+### لیست کاربران
+GET {{baseUrl}}/api/users?page=1&pageSize=20
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+
+### جزئیات کاربر
+GET {{baseUrl}}/api/users/00000000-0000-0000-0000-000000000000
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+
+### ساخت کاربر جدید
+POST {{baseUrl}}/api/users
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fullName": "کاربر جدید",
+  "email": "user@acme.com",
+  "password": "StrongPass1",
+  "roleNames": ["Viewer"],
+  "isActive": true
+}
+
+### ویرایش کاربر
+PUT {{baseUrl}}/api/users/00000000-0000-0000-0000-000000000000
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fullName": "نام جدید",
+  "displayName": "نام نمایشی",
+  "isActive": true
+}
+
+### اختصاص نقش‌ها به کاربر
+PUT {{baseUrl}}/api/users/00000000-0000-0000-0000-000000000000/roles
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "roleNames": ["Admin", "Viewer"]
+}
+
+### فعال/غیرفعال کردن کاربر
+PATCH {{baseUrl}}/api/users/00000000-0000-0000-0000-000000000000/toggle-active
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+false
+
+### بازنشانی رمز عبور
+POST {{baseUrl}}/api/users/00000000-0000-0000-0000-000000000000/reset-password
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "newPassword": "NewStrongPass1"
+}
+
+### حذف کاربر
+DELETE {{baseUrl}}/api/users/00000000-0000-0000-0000-000000000000
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+
+### ============================================================
+### Roles
+### ============================================================
+
+### لیست نقش‌ها
+GET {{baseUrl}}/api/roles
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+
+### لیست گروه‌بندی دسترسی‌ها
+GET {{baseUrl}}/api/roles/permissions
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+
+### ساخت نقش
+POST {{baseUrl}}/api/roles
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Editor",
+  "description": "ویرایشگر محتوا",
+  "permissions": ["dashboard.view", "users.view", "users.update"]
+}
+
+### ویرایش نقش (دسترسی‌ها)
+PUT {{baseUrl}}/api/roles/00000000-0000-0000-0000-000000000000
+X-Tenant-Slug: {{tenantSlug}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "description": "توضیح جدید",
+  "permissions": ["dashboard.view", "users.view"]
+}
+
+### ============================================================
+### Tenants (فقط SuperAdmin)
+### ============================================================
+
+### لیست tenantها
+GET {{baseUrl}}/api/admin/tenants
+Authorization: Bearer {{accessToken}}
+
+### ساخت tenant جدید
+POST {{baseUrl}}/api/admin/tenants
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Beta Corp",
+  "slug": "beta",
+  "connectionName": "Tenant_Beta",
+  "admin": {
+    "fullName": "ادمین بتا",
+    "email": "admin@beta.com",
+    "password": "StrongPass1"
+  }
+}
